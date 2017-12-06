@@ -25,6 +25,39 @@ public class JeVoisInterface {
             System.out.println("wrote " +  bytes + "/" + cmd.length() + " bytes, cmd: " + cmd);
         }
     }
+	
+    public void doInitConfig() {
+        if (visionPort != null){
+            System.out.println("configuring JeVois");
+            sendCmd("streamoff"); //Turn off video stream
+            sendCmd("setmapping 4"); //Run the sample passthrough program
+	    sendCmd("streamon");  //Resume video streaming
+		
+        }
+    }
+	
+    public void setCamVisionProcMode() {
+        if (visionPort != null){
+            System.out.println("configuring JeVois");
+            sendCmd("setcam autoexp 1"); //Disable auto exposure
+            sendCmd("setcam absexp 50"); //Force exposure to a low value for vision processing
+        }
+    }
+	
+    public void setCamHumanDriverMode() {
+        if (visionPort != null){
+            System.out.println("configuring JeVois");
+            sendCmd("setcam autoexp 0"); //Enable AutoExposure
+        }
+    }
+	
+	
+    private int sendCmd(String cmd){
+	    int bytes;
+            bytes = visionPort.writeString(cmd + "\n");
+            System.out.println("wrote " +  bytes + "/" + cmd.length() + " bytes, cmd: " + cmd);
+	    return bytes;
+    };
 
 
     public void getBytesPeriodic() {
@@ -36,5 +69,10 @@ public class JeVoisInterface {
                 ++loopCount;
             }
         }
-	}
+    }
 }
+
+//Other Resources: 
+// https://github.com/nyholku/purejavacomm
+// https://www.systutorials.com/docs/linux/man/8-setserial/
+// 
