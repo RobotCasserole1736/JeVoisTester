@@ -1,7 +1,19 @@
+package org.usfirst.frc.team1736.robot;
+
+import edu.wpi.cscore.MjpegServer;
+import edu.wpi.cscore.UsbCamera;
+import edu.wpi.first.wpilibj.SerialPort;
+
 public class JeVoisInterface {
 	static final int BAUD_RATE = 115200;
+	static final int MJPG_STREAM_PORT = 1180;
 	
 	SerialPort visionPort = null;
+	UsbCamera visionCam = null;
+	MjpegServer camServer = null;
+	
+	boolean camStreamRunning = false;
+	
 	int loopCount = 0;
 	
 
@@ -11,10 +23,47 @@ public class JeVoisInterface {
 			visionPort = new SerialPort(BAUD_RATE,SerialPort.Port.kUSB);
 			System.out.println("SUCCESS!!");
 		} catch (Exception e) {
-			System.out.println("FAILED!!  Fix and then restart code...");
-                        e.printStackTrace();
+			System.out.println("FAILED!!");
+            e.printStackTrace();
 		}
+		
+		doInitConfig();
+		
+		
 	} 
+	
+    public void doInitConfig() {
+        if (visionPort != null){
+            System.out.println("configuring JeVois");
+            stopCameraStream(); //Stop broadcasting camera stream
+            sendCmd("streamoff"); //Turn off video stream from JeVois
+            sendCmd("setmapping 4"); //Select the sample passthrough program
+            sendCmd("streamon");  //Resume video streaming
+            startCameraStream(); //start broadcasting camera stream
+		
+        }
+    }
+    
+	public void startCameraStream(){
+		try{
+			System.out.print("Starting JeVois Cam Stream...");
+			visionCam = new UsbCamera("VisionProcCam", 0);
+			camServer = new MjpegServer("VisionCamServer", MJPG_STREAM_PORT);
+			camServer.setSource(visionCam);
+			camStreamRunning = true;
+		} catch (Exception e) {
+			System.out.println("FAILED!!");
+            e.printStackTrace();
+		}
+	}
+	
+	public void stopCameraStream(){
+		if(camStreamRunning){
+			camServer.free();
+			visionCam.free();
+			camStreamRunning = false;
+		}
+	}
 	
 
     public void sendPing() {
@@ -23,16 +72,6 @@ public class JeVoisInterface {
             String cmd = "ping\n";
             int bytes = visionPort.writeString(cmd);
             System.out.println("wrote " +  bytes + "/" + cmd.length() + " bytes, cmd: " + cmd);
-        }
-    }
-	
-    public void doInitConfig() {
-        if (visionPort != null){
-            System.out.println("configuring JeVois");
-            sendCmd("streamoff"); //Turn off video stream
-            sendCmd("setmapping 4"); //Run the sample passthrough program
-	    sendCmd("streamon");  //Resume video streaming
-		
         }
     }
 	
