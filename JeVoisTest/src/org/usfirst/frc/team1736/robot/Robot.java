@@ -45,9 +45,14 @@ public class Robot extends IterativeRobot {
 	 */
 	@Override
 	public void autonomousPeriodic() {
-		testCam.getBytesPeriodic();
+		
 	}
 
+	@Override
+	public void teleopInit() {
+		testCam.sendCmdAndCheck("help2");
+	}
+	
 	/**
 	 * This function is called periodically during operator control
 	 */
