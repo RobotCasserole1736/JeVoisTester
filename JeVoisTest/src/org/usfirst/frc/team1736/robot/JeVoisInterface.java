@@ -9,12 +9,17 @@ public class JeVoisInterface {
 	static final int BAUD_RATE = 115200;
 	static final int MJPG_STREAM_PORT = 1180;
 	static final int JEVOIS_USER_PROGRAM_MAPPING_IDX = 25;
+	static final char PACKET_START_CHAR = '{';
+	static final char PACKET_END_CHAR = '}';
+	static final char PACKET_DILEM_CHAR = ',';
 	
 	SerialPort visionPort = null;
 	UsbCamera visionCam = null;
 	MjpegServer camServer = null;
 	
 	boolean camStreamRunning = false;
+    
+    String packetBuffer = "";
 
 	
 
@@ -217,6 +222,72 @@ public class JeVoisInterface {
                 		break;
                 	}
 
+                } else {
+                	sleep(10);
+                }
+            }
+        }
+        return retval;
+    }
+	
+    /** 
+     * Blocks thread execution till we get a valid packet from the serial line
+     * or timeout. 
+     * Return values:
+     *  String = the packet 
+     *  null = No full packet found before timeout_s
+     */
+    public String blockAndGetPacket(double timeout_s){
+    	String retval = null;
+    	double startTime = Timer.getFPGATimestamp();
+        if (visionPort != null){
+            while(Timer.getFPGATimestamp() - startTime < timeout_s){
+                //Keep trying to get bytes from the serial port until the timeout expires.
+                
+                if (visionPort.getBytesReceived() > 0) {
+                    //If there are any bytes available, read them in and 
+                    // append them to the buffer.
+                	packetBuffer += visionPort.readString();
+                    
+                    //Attempt to detect if the buffer currently contains a complete packet
+                	if(packetBuffer.contains(PACKET_START_CHAR)){
+                        //Buffer contains at least one start character. 
+				        if(packetBuffer.contains(PACKET_END_CHAR){
+                            //Buffer also contains at least one end character. 
+                            //Get the most-recent packet end character's index
+                            int endIdx = packetBuffer.lastIndexOf(PACKET_END_CHAR);
+                            
+                            // Look for the index of the start character for the packet
+                            //  described by endIdx. Note this line of code assumes the 
+                            //  start character for the packet must come _before_ the
+                            //  end character.
+                            int startIdx = lastIndexOf(PACKET_START_CHAR, endIdx);
+                            
+                            if(startIdx == -1){
+                                // If there was no start character before the end character,
+                                //  we can assume that we have something a bit wacky in our
+                                //  buffer. For example: ",abc}garbage{1,2".
+                                // Since we've started to recieve a good packet, discard 
+                                //  everything prior to the start character.
+                                startIdx = lastIndexOf(PACKET_START_CHAR);
+                                packetBuffer = packetBuffer.substring(startIdx);
+                            } else {
+                                // Buffer contains a full packet. Extract it.
+                                retval = packetBuffer.substring(startIdx+1, endIdx-1);
+                                // We no longer need this packet in the buffer.
+                                packetBuffer = packetBuffer.substring(endIdx+1);
+                                //We have a packet, jump out of the while() loop!
+                                break;
+                            } 
+                        } else {
+                          //In this case, we have a start character, but no end to the buffer yet. 
+                          // Do nothing, just wait for more characters to come in.
+                        }
+                    } else {
+                        //Buffer contains no start characters. None of the current buffer contents can 
+                        // be meaningful. Discard the whole thing.
+                        packetBuffer = "";
+                    }
                 } else {
                 	sleep(10);
                 }
