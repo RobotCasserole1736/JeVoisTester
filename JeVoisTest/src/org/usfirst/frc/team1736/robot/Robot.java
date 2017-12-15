@@ -37,7 +37,7 @@ public class Robot extends IterativeRobot {
 	 */
 	@Override
 	public void autonomousInit() {
-		testCam.sendPing();
+
 	}
 
 	/**
@@ -50,7 +50,7 @@ public class Robot extends IterativeRobot {
 
 	@Override
 	public void teleopInit() {
-		testCam.sendCmdAndCheck("help2");
+
 	}
 	
 	/**

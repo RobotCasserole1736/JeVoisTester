@@ -2,16 +2,16 @@ package org.usfirst.frc.team1736.robot;
 
 import edu.wpi.cscore.MjpegServer;
 import edu.wpi.cscore.UsbCamera;
+import edu.wpi.cscore.VideoMode.PixelFormat;
 import edu.wpi.first.wpilibj.SerialPort;
 import edu.wpi.first.wpilibj.Timer;
 
 public class JeVoisInterface {
 	static final int BAUD_RATE = 115200;
 	static final int MJPG_STREAM_PORT = 1180;
-	static final int JEVOIS_USER_PROGRAM_MAPPING_IDX = 25;
-	static final char PACKET_START_CHAR = '{';
-	static final char PACKET_END_CHAR = '}';
-	static final char PACKET_DILEM_CHAR = ',';
+	static final String PACKET_START_CHAR = "{";
+	static final String PACKET_END_CHAR = "}";
+	static final String PACKET_DILEM_CHAR = ",";
 	
 	SerialPort visionPort = null;
 	UsbCamera visionCam = null;
@@ -20,6 +20,8 @@ public class JeVoisInterface {
 	boolean camStreamRunning = false;
     
     String packetBuffer = "";
+    
+    boolean visionOnline = false;
 
 	
 
@@ -56,10 +58,13 @@ public class JeVoisInterface {
 			
 		//We've got a connected JeVois, go ahead and run the initilization
 		//Send serial commands to JeVois for init
-        sendCmdAndCheck("setmapping " + Integer.toString(JEVOIS_USER_PROGRAM_MAPPING_IDX));
+        //sendCmdAndCheck("setmapping " + Integer.toString(JEVOIS_USER_PROGRAM_MAPPING_IDX));
         
 		//Start streaming the JeVois
-        startCameraStream(); 
+        //startCameraStream(); 
+        
+        //Start listening for packets
+        cameraListener.start();
 	} 
     
     /**
@@ -69,6 +74,7 @@ public class JeVoisInterface {
 		try{
 			System.out.print("Starting JeVois Cam Stream...");
 			visionCam = new UsbCamera("VisionProcCam", 0);
+			visionCam.setVideoMode(PixelFormat.kYUYV, 640, 480, 15); //This is our mapping
 			camServer = new MjpegServer("VisionCamServer", MJPG_STREAM_PORT);
 			camServer.setSource(visionCam);
 			camStreamRunning = true;
@@ -252,7 +258,7 @@ public class JeVoisInterface {
                     //Attempt to detect if the buffer currently contains a complete packet
                 	if(packetBuffer.contains(PACKET_START_CHAR)){
                         //Buffer contains at least one start character. 
-				        if(packetBuffer.contains(PACKET_END_CHAR){
+				        if(packetBuffer.contains(PACKET_END_CHAR)){
                             //Buffer also contains at least one end character. 
                             //Get the most-recent packet end character's index
                             int endIdx = packetBuffer.lastIndexOf(PACKET_END_CHAR);
@@ -261,7 +267,7 @@ public class JeVoisInterface {
                             //  described by endIdx. Note this line of code assumes the 
                             //  start character for the packet must come _before_ the
                             //  end character.
-                            int startIdx = lastIndexOf(PACKET_START_CHAR, endIdx);
+                            int startIdx = packetBuffer.lastIndexOf(PACKET_START_CHAR, endIdx);
                             
                             if(startIdx == -1){
                                 // If there was no start character before the end character,
@@ -269,7 +275,7 @@ public class JeVoisInterface {
                                 //  buffer. For example: ",abc}garbage{1,2".
                                 // Since we've started to recieve a good packet, discard 
                                 //  everything prior to the start character.
-                                startIdx = lastIndexOf(PACKET_START_CHAR);
+                                startIdx = packetBuffer.lastIndexOf(PACKET_START_CHAR);
                                 packetBuffer = packetBuffer.substring(startIdx);
                             } else {
                                 // Buffer contains a full packet. Extract it.
@@ -304,6 +310,39 @@ public class JeVoisInterface {
 			e.printStackTrace();
 		}
     }
+    
+    public void blockAndPrintAllSerial(){
+        if (visionPort != null){
+            while(true){
+                if (visionPort.getBytesReceived() > 0) {
+                	System.out.print(visionPort.readString());
+            	} else {
+            		System.out.println("Nothing Rx'ed");
+                	sleep(100);
+                }
+            }
+        }
+
+    }
+    
+    /**
+     * Parse individual numbers from a packet
+     * @param pkt
+     */
+    public void parsePacket(String pkt){
+    	
+    }
+    
+    /**
+     * This thread runs a periodic task in the background to listen for vision camera packets.
+     */
+    Thread cameraListener = new Thread(new Runnable(){
+    	public void run(){
+    		blockAndPrintAllSerial();
+    		//String packet;
+    		//packet = blockAndGetPacket(10);
+    	}
+    });
     
 }
 
