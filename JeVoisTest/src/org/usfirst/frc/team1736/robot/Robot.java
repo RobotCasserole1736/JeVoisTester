@@ -1,5 +1,7 @@
 package org.usfirst.frc.team1736.robot;
 
+import org.usfirst.frc.team1736.lib.LoadMon.CasseroleRIOLoadMonitor;
+
 import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -14,6 +16,7 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 public class Robot extends IterativeRobot {
 
 	JeVoisInterface testCam;
+	CasseroleRIOLoadMonitor loadMon;
 	
 	/**
 	 * This function is run when the robot is first started up and should be
@@ -22,18 +25,28 @@ public class Robot extends IterativeRobot {
 	@Override
 	public void robotInit() {
 		testCam = new JeVoisInterface();
+		loadMon = new CasseroleRIOLoadMonitor();
 	}
-
+	
 	/**
-	 * This autonomous (along with the chooser code above) shows how to select
-	 * between different autonomous modes using the dashboard. The sendable
-	 * chooser code works with the Java SmartDashboard. If you prefer the
-	 * LabVIEW Dashboard, remove all of the chooser code and uncomment the
-	 * getString line to get the auto name from the text box below the Gyro
-	 *
-	 * You can add additional auto modes by adding additional comparisons to the
-	 * switch structure below with additional strings. If using the
-	 * SendableChooser make sure to add them to the chooser code above as well.
+	 * This function is called at the start of disabled
+	 */
+	@Override
+	public void disabledInit() {
+
+	}
+	
+	/**
+	 * This function is called periodically during disabled mode
+	 */
+	@Override
+	public void disabledPeriodic() {
+
+	}
+	
+	
+	/**
+	 * This function is called at the start of autonomous
 	 */
 	@Override
 	public void autonomousInit() {
@@ -47,7 +60,10 @@ public class Robot extends IterativeRobot {
 	public void autonomousPeriodic() {
 		
 	}
-
+	
+	/**
+	 * This function is called at the start of teleop
+	 */
 	@Override
 	public void teleopInit() {
 
@@ -58,6 +74,10 @@ public class Robot extends IterativeRobot {
 	 */
 	@Override
 	public void teleopPeriodic() {
+		System.out.println(loadMon.getCPULoadPct());
+		System.out.println(loadMon.getMemLoadPct());
+		System.out.println("----------");
+		
 	}
 
 	/**
