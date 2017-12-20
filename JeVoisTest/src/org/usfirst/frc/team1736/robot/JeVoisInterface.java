@@ -13,6 +13,15 @@ public class JeVoisInterface {
 	static final String PACKET_END_CHAR = "}";
 	static final String PACKET_DILEM_CHAR = ",";
 	
+	
+	//Confgure the camera to stream debug images or not.
+	static final boolean BROADCAST_USB_CAM = false;
+	
+	//When not streaming, use this mapping
+	static final int NO_STREAM_MAPPING = 2;
+	
+	//When streaming, use this set of configuration
+	
 	SerialPort visionPort = null;
 	UsbCamera visionCam = null;
 	MjpegServer camServer = null;
@@ -57,14 +66,22 @@ public class JeVoisInterface {
 		}
 			
 		//We've got a connected JeVois, go ahead and run the initilization
-		//Send serial commands to JeVois for init
-        //sendCmdAndCheck("setmapping " + Integer.toString(JEVOIS_USER_PROGRAM_MAPPING_IDX));
-        
-		//Start streaming the JeVois
-        //startCameraStream(); 
+		sendCmdAndCheck("setpar serout USB"); //Force serial output to USB
+		
+		if(BROADCAST_USB_CAM){
+			//Start streaming the JeVois
+	        startCameraStream(); 
+		} else {
+			sendCmdAndCheck("setmapping " + Integer.toString(NO_STREAM_MAPPING));
+			sendCmdAndCheck("streamon ");
+		}
+
+
+
         
         //Start listening for packets
         cameraListener.start();
+        
 	} 
     
     /**
@@ -74,7 +91,7 @@ public class JeVoisInterface {
 		try{
 			System.out.print("Starting JeVois Cam Stream...");
 			visionCam = new UsbCamera("VisionProcCam", 0);
-			visionCam.setVideoMode(PixelFormat.kYUYV, 640, 480, 15); //This is our mapping
+			visionCam.setVideoMode(PixelFormat.kBGR, 320, 240, 8); //This is our mapping
 			camServer = new MjpegServer("VisionCamServer", MJPG_STREAM_PORT);
 			camServer.setSource(visionCam);
 			camStreamRunning = true;
