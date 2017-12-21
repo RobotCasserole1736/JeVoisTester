@@ -98,6 +98,7 @@ public class JeVoisInterface {
 		}
         
         //Start listening for packets
+	packetListenerThread.setDaemon(true);
         packetListenerThread.start();
 
 	} 
