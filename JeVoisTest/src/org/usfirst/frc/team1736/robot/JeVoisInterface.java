@@ -362,7 +362,7 @@ public class JeVoisInterface {
      */
     public void blockAndPrintAllSerial(){
         if (visionPort != null){
-            while(true){
+            while(!Thread.interrupted()){
                 if (visionPort.getBytesReceived() > 0) {
                 	System.out.print(visionPort.readString());
             	} else {
