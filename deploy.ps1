@@ -85,3 +85,7 @@ $driveEject = New-Object -comObject Shell.Application
 $driveEject.Namespace(17).ParseName($drive_letter).InvokeVerb("Eject")
 
 $port.Close();
+
+echo "Deploy complete"
+
+pause
