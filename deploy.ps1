@@ -1,15 +1,28 @@
-################################################################################
-# Copyright 2017 FRC Team 1736 Robot Casserole
-################################################################################
+#########################################################################################
+# Copyright (C) 2017 FRC Team 1736 Robot Casserole - www.robotcasserole.org
+#########################################################################################
+# Non-legally-binding statement from Team 1736:
+#  Thank you for taking the time to read through our software! We hope you
+#   find it educational and informative! 
+#  Please feel free to snag our software for your own use in whatever project
+#   you have going on right now! We'd love to be able to help out! Shoot us 
+#   any questions you may have, all our contact info should be on our website
+#   (listed above).
+#  If you happen to end up using our software to make money, that is wonderful!
+#   Robot Casserole is always looking for more sponsors, so we'd be very appreciative
+#   if you would consider donating to our club to help further STEM education.
+#########################################################################################
+#
 # deploy.ps1 - sends locallly developed script to a connected JeVois camera
 #
-# Steps:
+# Algorithm:
 # 0) Verify python script syntax (compile with a local version of python)
 # 1) Search all COM ports for JeVois (unopened and responds correctly to ping)
 # 2) Send commands to put the JeVois in USB file transfer mode
 # 3) Copy the local development file over to the JeVois
 # 4) Eject the USB drive and close the 
-################################################################################
+#########################################################################################
+
 # Configuration - Edit these to taste for your team.
 
 #Local file - the one you edit on your PC
@@ -26,7 +39,7 @@ $dest_path = "modules\JeVois\CasseroleVision"
 $python_exe = "python"
 $python_compile = "py_compile"
 
-################################################################################
+#########################################################################################
 $jevois_port_name = ""
 
 echo "========================================================================"
