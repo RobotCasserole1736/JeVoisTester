@@ -23,7 +23,7 @@ public class JeVoisInterface {
 	
 	
 	//Confgure the camera to stream debug images or not.
-	static final boolean BROADCAST_USB_CAM = false;
+	private boolean broadcast_usb_cam = false;
 	
 	//When not streaming, use this mapping
 	static final int NO_STREAM_MAPPING = 2;
@@ -42,6 +42,7 @@ public class JeVoisInterface {
 	MjpegServer camServer = null;
 	
 	// Status variables 
+	boolean dataStreamRunning = false;
 	boolean camStreamRunning = false;
     boolean visionOnline = false;
 
@@ -84,24 +85,48 @@ public class JeVoisInterface {
 			return;
 		}
 			
-		//We've got a connected JeVois, go ahead and run the initilization
-		sendCmdAndCheck("setpar serout USB"); //Force serial output to USB
 		
-		if(BROADCAST_USB_CAM){
+
+        
+        //Start listening for packets
+		packetListenerThread.setDaemon(true);
+        packetListenerThread.start();
+
+	} 
+
+	public void start(){
+		if(broadcast_usb_cam){
 			//Start streaming the JeVois via webcam
 			//This auto-starts the serial stream
 	        startCameraStream(); 
 		} else {
-			//Send serial commands to start the sending of commands
-			sendCmdAndCheck("setmapping " + Integer.toString(NO_STREAM_MAPPING));
-			sendCmdAndCheck("streamon ");
+			startDataOnlyStream();
 		}
-        
-        //Start listening for packets
-	packetListenerThread.setDaemon(true);
-        packetListenerThread.start();
+	}
 
-	} 
+	public void stop(){
+		if(broadcast_usb_cam){
+			//Start streaming the JeVois via webcam
+			//This auto-starts the serial stream
+	        stopCameraStream(); 
+		} else {
+			stopDataOnlyStream();
+		}
+	}
+
+
+	public void startDataOnlyStream(){
+		//Send serial commands to start the streaming of target info
+		sendCmdAndCheck("setmapping " + Integer.toString(NO_STREAM_MAPPING));
+		sendCmdAndCheck("streamon ");
+		dataStreamRunning = true;
+	}
+
+	public void stopDataOnlyStream(){
+		//Send serial commands to stop the streaming of target info
+		sendCmdAndCheck("streamoff");
+		dataStreamRunning = false;
+	}
     
     /**
      * Open an Mjpeg streamer from the JeVois camera
@@ -114,6 +139,7 @@ public class JeVoisInterface {
 			camServer = new MjpegServer("VisionCamServer", MJPG_STREAM_PORT);
 			camServer.setSource(visionCam);
 			camStreamRunning = true;
+			dataStreamRunning = true;
 			System.out.println("SUCCESS!!");
 		} catch (Exception e) {
 			DriverStation.reportError("Cannot start camera stream from JeVois", false);
@@ -129,6 +155,7 @@ public class JeVoisInterface {
 			camServer.free();
 			visionCam.free();
 			camStreamRunning = false;
+			dataStreamRunning = false;
 		}
 	}
 	
