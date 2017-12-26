@@ -10,51 +10,76 @@ import edu.wpi.first.wpilibj.Timer;
 public class JeVoisInterface {
     
     // Serial Port Constants 
-    static final int BAUD_RATE = 115200;
+    private static final int BAUD_RATE = 115200;
     
     // MJPG Streaming Constants 
-    static final int MJPG_STREAM_PORT = 1180;
+    private static final int MJPG_STREAM_PORT = 1180;
     
     // Packet format constants 
-    static final String PACKET_START_CHAR = "{";
-    static final String PACKET_END_CHAR = "}";
-    static final String PACKET_DILEM_CHAR = ",";
-    static final int PACKET_NUM_EXPECTED_FIELDS = 3;
+    private static final String PACKET_START_CHAR = "{";
+    private static final String PACKET_END_CHAR = "}";
+    private static final String PACKET_DILEM_CHAR = ",";
+    private static final int PACKET_NUM_EXPECTED_FIELDS = 3;
     
     
-    //Confgure the camera to stream debug images or not.
-    private boolean broadcast_usb_cam = false;
+    // Confgure the camera to stream debug images or not.
+    private boolean broadcastUSBCam = false;
     
-    //When not streaming, use this mapping
-    static final int NO_STREAM_MAPPING = 2;
+    // When not streaming, use this mapping
+    private static final int NO_STREAM_MAPPING = 2;
     
-    //When streaming, use this set of configuration
-    static final int STREAM_WIDTH_PX = 320;
-    static final int STREAM_HEIGHT_PX = 240;
-    static final int STREAM_RATE_FPS = 15;
+    // When streaming, use this set of configuration
+    private static final int STREAM_WIDTH_PX = 352;
+    private static final int STREAM_HEIGHT_PX = 288;
+    private static final int STREAM_RATE_FPS = 15;
     
-
     // Serial port used for getting target data from JeVois 
-    SerialPort visionPort = null;
+    private SerialPort visionPort = null;
     
     // USBCam and server used for broadcasting a webstream of what is seen 
-    UsbCamera visionCam = null;
-    MjpegServer camServer = null;
+    private UsbCamera visionCam = null;
+    private MjpegServer camServer = null;
     
     // Status variables 
-    boolean dataStreamRunning = false;
-    boolean camStreamRunning = false;
-    boolean visionOnline = false;
+    private boolean dataStreamRunning = false;
+    private boolean camStreamRunning = false;
+    private boolean visionOnline = false;
 
-    // Most recently seen target 
-    private double tgtXPos;
-    private double tgtYPos;
-    private double tgtRange;
-    private double tgtTime;
+    // Packet rate performace tracking
+    private double packetRxTime = 0;
+    private double prevPacketRxTime = 0;
+    private double packetRate_PPS = 0;
+
+    // Most recently seen target information
+    private double tgtAngleDeg = 0;
+    private double tgtRange = 0;
+    private double tgtTime = 0;
+    
+    // Info about the JeVois performace & status
+    private double jeVoisCpuTempC = 0;
+    private double jeVoisCpuLoadPct = 0;
+    private double jeVoisFramerateFPS = 0;
+    private double packetRxRatePPS = 0;
     
     
+    //=======================================================
+    //== BEGIN PUBLIC INTERFACE
+    //=======================================================
 
+    /**
+     * Constructor. Opens a USB serial port to the JeVois camera, sends a few test commands checking for error,
+     * then fires up the user's program and begins listening for target info packets in the background
+     */
     public JeVoisInterface() {
+        JeVoisInterface(false); //Default - stream disabled, just run serial.
+    }
+
+    /**
+     * Constructor. Opens a USB serial port to the JeVois camera, sends a few test commands checking for error,
+     * then fires up the user's program and begins listening for target info packets in the background.
+     * Pass TRUE to additionaly enable a USB camera stream of what the vision camera is seeing.
+     */
+    public JeVoisInterface(boolean useUSBStream) {
         int retry_counter = 0;
         
         //Retry strategy to get this serial port open.
@@ -84,10 +109,10 @@ public class JeVoisInterface {
             DriverStation.reportError("JeVois ping test failed. Not starting vision system.", false);
             return;
         }
-            
-        
 
-        
+        setCameraStreamActive(useUSBStream);
+        start();
+
         //Start listening for packets
         packetListenerThread.setDaemon(true);
         packetListenerThread.start();
@@ -95,7 +120,7 @@ public class JeVoisInterface {
     } 
 
     public void start(){
-        if(broadcast_usb_cam){
+        if(broadcastUSBCam){
             //Start streaming the JeVois via webcam
             //This auto-starts the serial stream
             startCameraStream(); 
@@ -105,7 +130,7 @@ public class JeVoisInterface {
     }
 
     public void stop(){
-        if(broadcast_usb_cam){
+        if(broadcastUSBCam){
             //Start streaming the JeVois via webcam
             //This auto-starts the serial stream
             stopCameraStream(); 
@@ -113,25 +138,168 @@ public class JeVoisInterface {
             stopDataOnlyStream();
         }
     }
+    
+    /**
+     * Send commands to the JeVois to configure it for image-processing friendly parameters
+     */
+    public void setCamVisionProcMode() {
+        if (visionPort != null){
+            sendCmdAndCheck("setcam autoexp 1"); //Disable auto exposure
+            sendCmdAndCheck("setcam absexp 75"); //Force exposure to a low value for vision processing
+        }
+    }
+    
+    /**
+     * Send parameters to the camera to configure it for a human-readable image
+     */
+    public void setCamHumanDriverMode() {
+        if (visionPort != null){
+            sendCmdAndCheck("setcam autoexp 0"); //Enable AutoExposure
+        }
+    }
 
+    /*
+     * Main getters/setters
+     */
 
-    public void startDataOnlyStream(){
+    /**
+     * Set to true to enable the camera stream, or set to false to stream serial-packets only.
+     * Note this cannot be changed at runtime due to jevois constraints. You must stop whatatever processing
+     * is going on first.
+     */
+    public void setCameraStreamActive(boolean active){
+        if(dataStreamRunning == false){
+            broadcastUSBCam = active;
+        } else {
+            DriverStation.reportError("Attempt to change cal stream mode while JeVois is still running. This is disallowed.", false);
+        }
+        
+
+    }
+
+    /**
+     * Returns the most recently seen target's angle relative to the camera in degrees
+     * Positive means to the Right of center, negative means to the left
+     */
+    public double getTgtAngle_Deg() {
+        return tgtAngleDeg;
+    }
+
+    /**
+     * Returns the most recently seen target's range from the camera in inches
+     * Range means distance along the ground from camera mount point to observed target
+     * Return values should only be positive
+     */
+    public double getTgtRange_in() {
+        return tgtRange;
+    }
+    
+    /**
+     * Get the estimated timestamp of the most recent target observation.
+     * This is calculated based on the FPGA timestamp at packet RX time, minus the reportetd vision pipeline delay.
+     * It will not currently account for serial hardware or other delays.
+     */
+    public double getTgtTime() {
+        return tgtTime;
+    }
+    
+    /**
+     * Returns true when the roboRIO is recieving packets from the JeVois, false if no packets have been recieved.
+     * Other modules should not use the vision processing results if this returns false.
+     */
+    public boolean isVisionOnline() {
+        return visionOnline;
+    }
+    
+    /**
+     * Returns the JeVois's most recently reported CPU Temperature in deg C
+     */
+    public double getJeVoisCPUTemp_C(){
+        return jeVoisCpuTempC;
+    }
+
+    /**
+     * Returns the JeVois's most recently reported CPU Load in percent of max
+     */
+    public double jeVoisCpuLoad_pct(){
+        return jeVoisCpuLoadPct;
+    }
+
+    /**
+     * Returns the JeVois's most recently reported pipline framerate in Frames per second
+     */
+    public double jeVoisFramerate_FPS(){
+        return jeVoisFramerateFPS;
+    }
+
+    /**
+     * Returns the roboRIO measured serial packet recieve rate in packets per second
+     */
+    public double packetRxRate_PPS(){
+        return packetRxRatePPS;
+    }
+
+    //=======================================================
+    //== END PUBLIC INTERFACE
+    //=======================================================
+
+    
+    /**
+     * This is the main perodic update function for the Listener. It is intended
+     * to be run in a background task, as it will block until it gets packets. 
+     */
+    private void backgroundUpdate(){
+        
+        // Grab packets and parse them.
+        String packet;
+        
+        prevPacketRxTime = packetRxTime;
+        packet = blockAndGetPacket(10);
+        
+        
+        if(packet != null){
+            packetRxTime = Timer.getFPGATimestamp();
+            visionOnline = true;
+            parsePacket(packet, packetRxTime);
+            packetRxRatePPS = 1.0/(packetRxTime - prevPacketRxTime);
+            
+        } else {
+            visionOnline = false;
+            DriverStation.reportWarning("Cannot get packet from JeVois Vision Processor", false);
+        }
+        
+    }
+
+    /**
+     * Send the ping command to the JeVois to verify it is connected
+     * @return 0 on success, -1 on unexpected response, -2 on timeout
+     */
+    private int sendPing() {
+        int retval = -1;
+        if (visionPort != null){
+            retval = sendCmdAndCheck("ping");
+        }
+        return retval;
+    }
+
+    private void startDataOnlyStream(){
         //Send serial commands to start the streaming of target info
         sendCmdAndCheck("setmapping " + Integer.toString(NO_STREAM_MAPPING));
-        sendCmdAndCheck("streamon ");
+        sendCmdAndCheck("streamon");
         dataStreamRunning = true;
     }
 
-    public void stopDataOnlyStream(){
+    private void stopDataOnlyStream(){
         //Send serial commands to stop the streaming of target info
         sendCmdAndCheck("streamoff");
         dataStreamRunning = false;
     }
     
+
     /**
      * Open an Mjpeg streamer from the JeVois camera
      */
-    public void startCameraStream(){
+    private void startCameraStream(){
         try{
             System.out.print("Starting JeVois Cam Stream...");
             visionCam = new UsbCamera("VisionProcCam", 0);
@@ -150,66 +318,12 @@ public class JeVoisInterface {
     /**
      * Cease the operation of the camera stream. Unknown if needed.
      */
-    public void stopCameraStream(){
+    private void stopCameraStream(){
         if(camStreamRunning){
             camServer.free();
             visionCam.free();
             camStreamRunning = false;
             dataStreamRunning = false;
-        }
-    }
-    
-    /**
-     * This is the main perodic update function for the Listener. It is intended
-     * to be run in a background task, as it will block until it gets packets. 
-     */
-    private void backgroundUpdate(){
-        
-        //Debug - just print whatever we get on the serial port
-        blockAndPrintAllSerial();
-        
-        //Real code - Grab packets and parse them.
-        String packet;
-        packet = blockAndGetPacket(10);
-        
-        if(packet != null){
-            visionOnline = true;
-            parsePacket(packet);
-        } else {
-            visionOnline = false;
-            DriverStation.reportWarning("Cannot get packet from JeVois Vision Processor", false);
-        }
-        
-    }
-    
-    /**
-     * Send the ping command to the JeVois to verify it is connected
-     * @return 0 on success, -1 on unexpected response, -2 on timeout
-     */
-    public int sendPing() {
-        int retval = -1;
-        if (visionPort != null){
-            retval = sendCmdAndCheck("ping");
-        }
-        return retval;
-    }
-    
-    /**
-     * Send commands to the JeVois to configure it for image-processing friendly parameters
-     */
-    public void setCamVisionProcMode() {
-        if (visionPort != null){
-            sendCmdAndCheck("setcam autoexp 1"); //Disable auto exposure
-            sendCmdAndCheck("setcam absexp 50"); //Force exposure to a low value for vision processing
-        }
-    }
-    
-    /**
-     * Send parameters to the camera to configure it for a human-readable image
-     */
-    public void setCamHumanDriverMode() {
-        if (visionPort != null){
-            sendCmdAndCheck("setcam autoexp 0"); //Enable AutoExposure
         }
     }
     
@@ -251,7 +365,7 @@ public class JeVoisInterface {
      * Will return the whole thing once the first "OK" or "ERR" is seen in the stream.
      * Returns null if no string read back yet.
      */
-    public String getCmdResponseNonBlock() {
+    private String getCmdResponseNonBlock() {
         String retval =  null;
         if (visionPort != null){
             if (visionPort.getBytesReceived() > 0) {
@@ -279,7 +393,7 @@ public class JeVoisInterface {
      * -1 = ERR in response
      * -2 = No token found before timeout_s
      */
-    public int blockAndCheckForOK(double timeout_s){
+    private int blockAndCheckForOK(double timeout_s){
         int retval = -2;
         double startTime = Timer.getFPGATimestamp();
         String testStr = "";
@@ -313,7 +427,7 @@ public class JeVoisInterface {
      *  String = the packet 
      *  null = No full packet found before timeout_s
      */
-    public String blockAndGetPacket(double timeout_s){
+    private String blockAndGetPacket(double timeout_s){
         String retval = null;
         double startTime = Timer.getFPGATimestamp();
         if (visionPort != null){
@@ -406,32 +520,10 @@ public class JeVoisInterface {
      * Parse individual numbers from a packet
      * @param pkt
      */
-    public void parsePacket(String pkt){
-        //TODO
+    public void parsePacket(String pkt, double rx_Time){
+        //TODO - populate the following based on packet contents & rxTime:
+        // AngleDeg, tgtRange, tgtTime, jeVoisCpuTempC, jeVoisCpuLoadPct, jeVoisFramerateFPS
         
-    }
-    
-    /*
-     * Main getters/setters
-     */
-    public double getTgtXPos() {
-        return tgtXPos;
-    }
-
-    public double getTgtYPos() {
-        return tgtYPos;
-    }
-
-    public double getTgtRange() {
-        return tgtRange;
-    }
-    
-    public double getTgtTime() {
-        return tgtTime;
-    }
-    
-    public boolean isVisionOnline() {
-        return visionOnline;
     }
     
     

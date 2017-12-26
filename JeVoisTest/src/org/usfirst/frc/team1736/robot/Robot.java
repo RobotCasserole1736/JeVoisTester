@@ -24,7 +24,7 @@ public class Robot extends IterativeRobot {
      */
     @Override
     public void robotInit() {
-        testCam = new JeVoisInterface();
+        testCam = new JeVoisInterface(false);
         loadMon = new CasseroleRIOLoadMonitor();
     }
     

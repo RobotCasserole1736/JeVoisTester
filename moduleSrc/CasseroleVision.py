@@ -3,6 +3,7 @@ import time
 import re
 import numpy as np
 import cv2
+from datetime import datetime
 ####################################################################################################
 ## Copyright 2017 FRC Team 1736 Robot Casserole
 ####################################################################################################
@@ -22,6 +23,7 @@ class CasseroleVision:
         self.frame_dec_factor = 4
 
         #Processing tune constants
+        #TODO - Pick better constants
         self.hsv_thres_lower = np.array([0,0,220])
         self.hsv_thres_upper = np.array([255,255,255])
 
@@ -31,15 +33,16 @@ class CasseroleVision:
         self.tgtAvailable = "f"
 
         #Timer and Variables to track statistics we care about
-        self.timer = jevois.Timer("sandbox", 25, jevois.LOG_DEBUG)
+        self.timer = jevois.Timer("CasseroleVisionStats", 25, jevois.LOG_DEBUG)
 
-        #regex for parsing info out of the status returned from the Timer class 
+        #regex for parsing info out of the status returned from the jevois Timer class 
         self.pattern = re.compile('([0-9]*\.[0-9]+|[0-9]+) fps, ([0-9]*\.[0-9]+|[0-9]+)% CPU, ([0-9]*\.[0-9]+|[0-9]+)C,')
 
         #Tracked stats
-        self.fps = "0"
-        self.CPULoad = "0"
-        self.CPUTemp = "0"
+        self.framerate_fps = "0"
+        self.CPULoad_pct = "0"
+        self.CPUTemp_C = "0"
+        self.pipelineDelay_us = "0"
 
         #data structure object to hold info about the present data processed from the image fram
         self.curTargets = []
@@ -61,6 +64,9 @@ class CasseroleVision:
         #Capture image from camera
         inimg = inframe.getCvBGR()
         self.frame += 1
+
+        #Mark start of pipeline time
+        pipline_start_time = datetime.now()
 
         ###############################################
         ## Start Image Processing Pipeline
@@ -101,7 +107,7 @@ class CasseroleVision:
             best_target = self.curTargets[0] #Start presuming the first is the best
             for tgt in self.curTargets[1:]:
                 #Super-simple algorithm: biggest target wins
-                # Once the game is released, we should do more qualification than this.
+                #TODO - make this better
                 if(tgt.boundedArea > best_target.boundedArea):
                     best_target = tgt 
 
@@ -118,10 +124,15 @@ class CasseroleVision:
         ###############################################
         ## End Image Processing Pipeline
         ###############################################
+
+        #Mark end of pipline
+        # For accuracy, Must be done as close to sending the serial data as possible 
+        pipeline_end_time = datetime.now() - pipline_start_time
+        self.pipelineDelay_us = pipeline_end_time.microseconds
         
         # Send processed data about target location and current status
         # Note the order and number of params here must match with the roboRIO code.
-        jevois.sendSerial("{{{},{},{},{},{},{},{}}}\n".format(self.frame,("T" if self.tgtAvailable else "F"),self.tgtAngle, self.tgtRange,self.fps,self.CPULoad,self.CPUTemp))
+        jevois.sendSerial("{{{},{},{},{},{},{},{},{}}}\n".format(self.frame,("T" if self.tgtAvailable else "F"),self.tgtAngle, self.tgtRange,self.framerate_fps,self.CPULoad_pct,self.CPUTemp_C,self.pipelineDelay_us))
         
 
         # Broadcast the frame if we have an output sink available
@@ -136,9 +147,9 @@ class CasseroleVision:
                 if(self.tgtAvailable):
                     top    = int(best_target.Y - best_target.height/2)
                     bottom = int(best_target.Y + best_target.height/2)
-                    left  = int(best_target.X - best_target.width/2)
-                    right = int(best_target.X + best_target.width/2)
-                    cv2.rectangle(outimg, (right,top),(left,bottom),(255,0,0), 2,cv2.LINE_4)
+                    left   = int(best_target.X - best_target.width/2)
+                    right  = int(best_target.X + best_target.width/2)
+                    cv2.rectangle(outimg, (right,top),(left,bottom),(0,255,0), 2,cv2.LINE_4)
 
                 # We are done with the output, ready to send it to host over USB:
                 outframe.sendCvBGR(outimg)
@@ -146,9 +157,9 @@ class CasseroleVision:
         # Track Processor Statistics
         results = self.pattern.match(self.timer.stop())
         if(results is not None):
-            self.fps = results.group(1)
-            self.CPULoad = results.group(2)
-            self.CPUTemp = results.group(3)
+            self.framerate_fps = results.group(1)
+            self.CPULoad_pct = results.group(2)
+            self.CPUTemp_C = results.group(3)
 
     # ###################################################################################################
     ## Parse a serial command forwarded to us by the JeVois Engine, return a string
