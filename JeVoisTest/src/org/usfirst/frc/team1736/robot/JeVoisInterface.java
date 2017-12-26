@@ -8,192 +8,192 @@ import edu.wpi.first.wpilibj.SerialPort;
 import edu.wpi.first.wpilibj.Timer;
 
 public class JeVoisInterface {
-	
-	// Serial Port Constants 
-	static final int BAUD_RATE = 115200;
-	
-	// MJPG Streaming Constants 
-	static final int MJPG_STREAM_PORT = 1180;
-	
-	// Packet format constants 
-	static final String PACKET_START_CHAR = "{";
-	static final String PACKET_END_CHAR = "}";
-	static final String PACKET_DILEM_CHAR = ",";
-	static final int PACKET_NUM_EXPECTED_FIELDS = 3;
-	
-	
-	//Confgure the camera to stream debug images or not.
-	private boolean broadcast_usb_cam = false;
-	
-	//When not streaming, use this mapping
-	static final int NO_STREAM_MAPPING = 2;
-	
-	//When streaming, use this set of configuration
-	static final int STREAM_WIDTH_PX = 320;
-	static final int STREAM_HEIGHT_PX = 240;
-	static final int STREAM_RATE_FPS = 15;
-	
+    
+    // Serial Port Constants 
+    static final int BAUD_RATE = 115200;
+    
+    // MJPG Streaming Constants 
+    static final int MJPG_STREAM_PORT = 1180;
+    
+    // Packet format constants 
+    static final String PACKET_START_CHAR = "{";
+    static final String PACKET_END_CHAR = "}";
+    static final String PACKET_DILEM_CHAR = ",";
+    static final int PACKET_NUM_EXPECTED_FIELDS = 3;
+    
+    
+    //Confgure the camera to stream debug images or not.
+    private boolean broadcast_usb_cam = false;
+    
+    //When not streaming, use this mapping
+    static final int NO_STREAM_MAPPING = 2;
+    
+    //When streaming, use this set of configuration
+    static final int STREAM_WIDTH_PX = 320;
+    static final int STREAM_HEIGHT_PX = 240;
+    static final int STREAM_RATE_FPS = 15;
+    
 
-	// Serial port used for getting target data from JeVois 
-	SerialPort visionPort = null;
-	
-	// USBCam and server used for broadcasting a webstream of what is seen 
-	UsbCamera visionCam = null;
-	MjpegServer camServer = null;
-	
-	// Status variables 
-	boolean dataStreamRunning = false;
-	boolean camStreamRunning = false;
+    // Serial port used for getting target data from JeVois 
+    SerialPort visionPort = null;
+    
+    // USBCam and server used for broadcasting a webstream of what is seen 
+    UsbCamera visionCam = null;
+    MjpegServer camServer = null;
+    
+    // Status variables 
+    boolean dataStreamRunning = false;
+    boolean camStreamRunning = false;
     boolean visionOnline = false;
 
-	// Most recently seen target 
+    // Most recently seen target 
     private double tgtXPos;
-	private double tgtYPos;
+    private double tgtYPos;
     private double tgtRange;
     private double tgtTime;
     
     
 
-	public JeVoisInterface() {
-		int retry_counter = 0;
-		
-		//Retry strategy to get this serial port open.
-		//I have yet to see a single retry used assuming the camera is plugged in
-		// but you never know.
-		while(visionPort == null && retry_counter++ < 10){
-			try {
-				System.out.print("Creating JeVois SerialPort...");
-				visionPort = new SerialPort(BAUD_RATE,SerialPort.Port.kUSB);
-				System.out.println("SUCCESS!!");
-			} catch (Exception e) {
-				System.out.println("FAILED!!");
-	            e.printStackTrace();
-	            sleep(500);
-	            System.out.println("Retry " + Integer.toString(retry_counter));
-			}
-		}
-		
-		//Report an error if we didn't get to open the serial port
-		if(visionPort == null){
-			DriverStation.reportError("Error, Cannot open serial port to JeVois. Not starting vision system.", false);
-			return;
-		}
-		
-		//Test to make sure we are actually talking to the JeVois
-		if(sendPing() != 0){
-			DriverStation.reportError("JeVois ping test failed. Not starting vision system.", false);
-			return;
-		}
-			
-		
+    public JeVoisInterface() {
+        int retry_counter = 0;
+        
+        //Retry strategy to get this serial port open.
+        //I have yet to see a single retry used assuming the camera is plugged in
+        // but you never know.
+        while(visionPort == null && retry_counter++ < 10){
+            try {
+                System.out.print("Creating JeVois SerialPort...");
+                visionPort = new SerialPort(BAUD_RATE,SerialPort.Port.kUSB);
+                System.out.println("SUCCESS!!");
+            } catch (Exception e) {
+                System.out.println("FAILED!!");
+                e.printStackTrace();
+                sleep(500);
+                System.out.println("Retry " + Integer.toString(retry_counter));
+            }
+        }
+        
+        //Report an error if we didn't get to open the serial port
+        if(visionPort == null){
+            DriverStation.reportError("Error, Cannot open serial port to JeVois. Not starting vision system.", false);
+            return;
+        }
+        
+        //Test to make sure we are actually talking to the JeVois
+        if(sendPing() != 0){
+            DriverStation.reportError("JeVois ping test failed. Not starting vision system.", false);
+            return;
+        }
+            
+        
 
         
         //Start listening for packets
-		packetListenerThread.setDaemon(true);
+        packetListenerThread.setDaemon(true);
         packetListenerThread.start();
 
-	} 
+    } 
 
-	public void start(){
-		if(broadcast_usb_cam){
-			//Start streaming the JeVois via webcam
-			//This auto-starts the serial stream
-	        startCameraStream(); 
-		} else {
-			startDataOnlyStream();
-		}
-	}
+    public void start(){
+        if(broadcast_usb_cam){
+            //Start streaming the JeVois via webcam
+            //This auto-starts the serial stream
+            startCameraStream(); 
+        } else {
+            startDataOnlyStream();
+        }
+    }
 
-	public void stop(){
-		if(broadcast_usb_cam){
-			//Start streaming the JeVois via webcam
-			//This auto-starts the serial stream
-	        stopCameraStream(); 
-		} else {
-			stopDataOnlyStream();
-		}
-	}
+    public void stop(){
+        if(broadcast_usb_cam){
+            //Start streaming the JeVois via webcam
+            //This auto-starts the serial stream
+            stopCameraStream(); 
+        } else {
+            stopDataOnlyStream();
+        }
+    }
 
 
-	public void startDataOnlyStream(){
-		//Send serial commands to start the streaming of target info
-		sendCmdAndCheck("setmapping " + Integer.toString(NO_STREAM_MAPPING));
-		sendCmdAndCheck("streamon ");
-		dataStreamRunning = true;
-	}
+    public void startDataOnlyStream(){
+        //Send serial commands to start the streaming of target info
+        sendCmdAndCheck("setmapping " + Integer.toString(NO_STREAM_MAPPING));
+        sendCmdAndCheck("streamon ");
+        dataStreamRunning = true;
+    }
 
-	public void stopDataOnlyStream(){
-		//Send serial commands to stop the streaming of target info
-		sendCmdAndCheck("streamoff");
-		dataStreamRunning = false;
-	}
+    public void stopDataOnlyStream(){
+        //Send serial commands to stop the streaming of target info
+        sendCmdAndCheck("streamoff");
+        dataStreamRunning = false;
+    }
     
     /**
      * Open an Mjpeg streamer from the JeVois camera
      */
-	public void startCameraStream(){
-		try{
-			System.out.print("Starting JeVois Cam Stream...");
-			visionCam = new UsbCamera("VisionProcCam", 0);
-			visionCam.setVideoMode(PixelFormat.kBGR, STREAM_WIDTH_PX, STREAM_HEIGHT_PX, STREAM_RATE_FPS);
-			camServer = new MjpegServer("VisionCamServer", MJPG_STREAM_PORT);
-			camServer.setSource(visionCam);
-			camStreamRunning = true;
-			dataStreamRunning = true;
-			System.out.println("SUCCESS!!");
-		} catch (Exception e) {
-			DriverStation.reportError("Cannot start camera stream from JeVois", false);
+    public void startCameraStream(){
+        try{
+            System.out.print("Starting JeVois Cam Stream...");
+            visionCam = new UsbCamera("VisionProcCam", 0);
+            visionCam.setVideoMode(PixelFormat.kBGR, STREAM_WIDTH_PX, STREAM_HEIGHT_PX, STREAM_RATE_FPS);
+            camServer = new MjpegServer("VisionCamServer", MJPG_STREAM_PORT);
+            camServer.setSource(visionCam);
+            camStreamRunning = true;
+            dataStreamRunning = true;
+            System.out.println("SUCCESS!!");
+        } catch (Exception e) {
+            DriverStation.reportError("Cannot start camera stream from JeVois", false);
             e.printStackTrace();
-		}
-	}
-	
-	/**
-	 * Cease the operation of the camera stream. Unknown if needed.
-	 */
-	public void stopCameraStream(){
-		if(camStreamRunning){
-			camServer.free();
-			visionCam.free();
-			camStreamRunning = false;
-			dataStreamRunning = false;
-		}
-	}
-	
-	/**
-	 * This is the main perodic update function for the Listener. It is intended
-	 * to be run in a background task, as it will block until it gets packets. 
-	 */
-	private void backgroundUpdate(){
-		
-		//Debug - just print whatever we get on the serial port
-		blockAndPrintAllSerial();
-		
-		//Real code - Grab packets and parse them.
-		String packet;
-		packet = blockAndGetPacket(10);
-		
-		if(packet != null){
-			visionOnline = true;
-			parsePacket(packet);
-		} else {
-			visionOnline = false;
-			DriverStation.reportWarning("Cannot get packet from JeVois Vision Processor", false);
-		}
-		
-	}
-	
-	/**
-	 * Send the ping command to the JeVois to verify it is connected
-	 * @return 0 on success, -1 on unexpected response, -2 on timeout
-	 */
+        }
+    }
+    
+    /**
+     * Cease the operation of the camera stream. Unknown if needed.
+     */
+    public void stopCameraStream(){
+        if(camStreamRunning){
+            camServer.free();
+            visionCam.free();
+            camStreamRunning = false;
+            dataStreamRunning = false;
+        }
+    }
+    
+    /**
+     * This is the main perodic update function for the Listener. It is intended
+     * to be run in a background task, as it will block until it gets packets. 
+     */
+    private void backgroundUpdate(){
+        
+        //Debug - just print whatever we get on the serial port
+        blockAndPrintAllSerial();
+        
+        //Real code - Grab packets and parse them.
+        String packet;
+        packet = blockAndGetPacket(10);
+        
+        if(packet != null){
+            visionOnline = true;
+            parsePacket(packet);
+        } else {
+            visionOnline = false;
+            DriverStation.reportWarning("Cannot get packet from JeVois Vision Processor", false);
+        }
+        
+    }
+    
+    /**
+     * Send the ping command to the JeVois to verify it is connected
+     * @return 0 on success, -1 on unexpected response, -2 on timeout
+     */
     public int sendPing() {
-    	int retval = -1;
+        int retval = -1;
         if (visionPort != null){
             retval = sendCmdAndCheck("ping");
         }
         return retval;
     }
-	
+    
     /**
      * Send commands to the JeVois to configure it for image-processing friendly parameters
      */
@@ -203,7 +203,7 @@ public class JeVoisInterface {
             sendCmdAndCheck("setcam absexp 50"); //Force exposure to a low value for vision processing
         }
     }
-	
+    
     /**
      * Send parameters to the camera to configure it for a human-readable image
      */
@@ -212,17 +212,17 @@ public class JeVoisInterface {
             sendCmdAndCheck("setcam autoexp 0"); //Enable AutoExposure
         }
     }
-	
-	/**
-	 * Sends a command over serial to JeVois and returns immediately.
+    
+    /**
+     * Sends a command over serial to JeVois and returns immediately.
      * @param cmd String of the command to send (ex: "ping")
-	 * @return number of bytes written
-	 */
+     * @return number of bytes written
+     */
     private int sendCmd(String cmd){
-	    int bytes;
+        int bytes;
         bytes = visionPort.writeString(cmd + "\n");
         System.out.println("wrote " +  bytes + "/" + (cmd.length()+1) + " bytes, cmd: " + cmd);
-	    return bytes;
+        return bytes;
     };
     
     /**
@@ -232,43 +232,43 @@ public class JeVoisInterface {
      * @return 0 if OK detected, -1 if ERR detected, -2 if timeout waiting for response
      */
     public int sendCmdAndCheck(String cmd){
-    	int retval = 0;
-	    sendCmd(cmd);
-	    retval = blockAndCheckForOK(1.0);
-	    if(retval == -1){
-	    	System.out.println(cmd + " Produced an error");
-	    } else if (retval == -2) {
-	    	System.out.println(cmd + " timed out");
-	    }
-	    return retval;
+        int retval = 0;
+        sendCmd(cmd);
+        retval = blockAndCheckForOK(1.0);
+        if(retval == -1){
+            System.out.println(cmd + " Produced an error");
+        } else if (retval == -2) {
+            System.out.println(cmd + " timed out");
+        }
+        return retval;
     };
 
     //Persistent but "local" variables for getBytesPeriodic()
     private String getBytesWork = "";
-	private int loopCount = 0;
+    private int loopCount = 0;
     /**
      * Read bytes from the serial port in a non-blocking fashion
      * Will return the whole thing once the first "OK" or "ERR" is seen in the stream.
      * Returns null if no string read back yet.
      */
     public String getCmdResponseNonBlock() {
-    	String retval =  null;
+        String retval =  null;
         if (visionPort != null){
             if (visionPort.getBytesReceived() > 0) {
-            	String rxString = visionPort.readString();
+                String rxString = visionPort.readString();
                 System.out.println("Waited: " + loopCount + " loops, Rcv'd: " + rxString);
                 getBytesWork += rxString;
                 if(getBytesWork.contains("OK") || getBytesWork.contains("ERR")){
-                	retval = getBytesWork;
-                	getBytesWork = "";
-                	System.out.println(retval);
+                    retval = getBytesWork;
+                    getBytesWork = "";
+                    System.out.println(retval);
                 }
                 loopCount = 0;
             } else {
                 ++loopCount;
             }
         }
-		return retval;
+        return retval;
     }
     
     /** 
@@ -280,23 +280,23 @@ public class JeVoisInterface {
      * -2 = No token found before timeout_s
      */
     public int blockAndCheckForOK(double timeout_s){
-    	int retval = -2;
-    	double startTime = Timer.getFPGATimestamp();
-    	String testStr = "";
+        int retval = -2;
+        double startTime = Timer.getFPGATimestamp();
+        String testStr = "";
         if (visionPort != null){
             while(Timer.getFPGATimestamp() - startTime < timeout_s){
                 if (visionPort.getBytesReceived() > 0) {
-                	testStr += visionPort.readString();
-                	if(testStr.contains("OK")){
-                		retval = 0;
-                		break;
-                	}else if(testStr.contains("ERR")){
-                		retval = -1;
-                		break;
-                	}
+                    testStr += visionPort.readString();
+                    if(testStr.contains("OK")){
+                        retval = 0;
+                        break;
+                    }else if(testStr.contains("ERR")){
+                        retval = -1;
+                        break;
+                    }
 
                 } else {
-                	sleep(10);
+                    sleep(10);
                 }
             }
         }
@@ -314,8 +314,8 @@ public class JeVoisInterface {
      *  null = No full packet found before timeout_s
      */
     public String blockAndGetPacket(double timeout_s){
-    	String retval = null;
-    	double startTime = Timer.getFPGATimestamp();
+        String retval = null;
+        double startTime = Timer.getFPGATimestamp();
         if (visionPort != null){
             while(Timer.getFPGATimestamp() - startTime < timeout_s){
                 // Keep trying to get bytes from the serial port until the timeout expires.
@@ -323,13 +323,13 @@ public class JeVoisInterface {
                 if (visionPort.getBytesReceived() > 0) {
                     // If there are any bytes available, read them in and 
                     //  append them to the buffer.
-                	packetBuffer += visionPort.readString();
+                    packetBuffer += visionPort.readString();
                     
                     // Attempt to detect if the buffer currently contains a complete packet
-                	if(packetBuffer.contains(PACKET_START_CHAR)){
-				        if(packetBuffer.contains(PACKET_END_CHAR)){
+                    if(packetBuffer.contains(PACKET_START_CHAR)){
+                        if(packetBuffer.contains(PACKET_END_CHAR)){
                             // Buffer also contains at least one start & end character.
-				        	// But we don't know if they're in the right order yet.
+                            // But we don't know if they're in the right order yet.
                             // Start by getting the most-recent packet end character's index
                             int endIdx = packetBuffer.lastIndexOf(PACKET_END_CHAR);
                             
@@ -363,7 +363,7 @@ public class JeVoisInterface {
                         packetBuffer = "";
                     }
                 } else {
-                	sleep(10);
+                    sleep(10);
                 }
             }
         }
@@ -375,12 +375,12 @@ public class JeVoisInterface {
      * @param time_ms
      */
     private void sleep(int time_ms){
-    	try {
-			Thread.sleep(time_ms);
-		} catch (InterruptedException e) {
-			System.out.println("DO NOT WAKE THE SLEEPY BEAST");
-			e.printStackTrace();
-		}
+        try {
+            Thread.sleep(time_ms);
+        } catch (InterruptedException e) {
+            System.out.println("DO NOT WAKE THE SLEEPY BEAST");
+            e.printStackTrace();
+        }
     }
     
     /**
@@ -392,10 +392,10 @@ public class JeVoisInterface {
         if (visionPort != null){
             while(!Thread.interrupted()){
                 if (visionPort.getBytesReceived() > 0) {
-                	System.out.print(visionPort.readString());
-            	} else {
-            		System.out.println("Nothing Rx'ed");
-                	sleep(100);
+                    System.out.print(visionPort.readString());
+                } else {
+                    System.out.println("Nothing Rx'ed");
+                    sleep(100);
                 }
             }
         }
@@ -407,41 +407,41 @@ public class JeVoisInterface {
      * @param pkt
      */
     public void parsePacket(String pkt){
-    	//TODO
-    	
+        //TODO
+        
     }
     
     /*
      * Main getters/setters
      */
     public double getTgtXPos() {
-		return tgtXPos;
-	}
+        return tgtXPos;
+    }
 
-	public double getTgtYPos() {
-		return tgtYPos;
-	}
+    public double getTgtYPos() {
+        return tgtYPos;
+    }
 
-	public double getTgtRange() {
-		return tgtRange;
-	}
-	
-	public double getTgtTime() {
-		return tgtTime;
-	}
-	
-	public boolean isVisionOnline() {
-		return visionOnline;
-	}
-	
+    public double getTgtRange() {
+        return tgtRange;
+    }
+    
+    public double getTgtTime() {
+        return tgtTime;
+    }
+    
+    public boolean isVisionOnline() {
+        return visionOnline;
+    }
+    
     
     /**
      * This thread runs a periodic task in the background to listen for vision camera packets.
      */
     Thread packetListenerThread = new Thread(new Runnable(){
-    	public void run(){
-    		backgroundUpdate();		
-    	}
+        public void run(){
+            backgroundUpdate();        
+        }
     });
     
 }

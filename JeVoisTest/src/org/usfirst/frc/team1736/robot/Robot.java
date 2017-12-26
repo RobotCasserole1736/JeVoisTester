@@ -15,76 +15,76 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
  */
 public class Robot extends IterativeRobot {
 
-	JeVoisInterface testCam;
-	CasseroleRIOLoadMonitor loadMon;
-	
-	/**
-	 * This function is run when the robot is first started up and should be
-	 * used for any initialization code.
-	 */
-	@Override
-	public void robotInit() {
-		testCam = new JeVoisInterface();
-		loadMon = new CasseroleRIOLoadMonitor();
-	}
-	
-	/**
-	 * This function is called at the start of disabled
-	 */
-	@Override
-	public void disabledInit() {
+    JeVoisInterface testCam;
+    CasseroleRIOLoadMonitor loadMon;
+    
+    /**
+     * This function is run when the robot is first started up and should be
+     * used for any initialization code.
+     */
+    @Override
+    public void robotInit() {
+        testCam = new JeVoisInterface();
+        loadMon = new CasseroleRIOLoadMonitor();
+    }
+    
+    /**
+     * This function is called at the start of disabled
+     */
+    @Override
+    public void disabledInit() {
 
-	}
-	
-	/**
-	 * This function is called periodically during disabled mode
-	 */
-	@Override
-	public void disabledPeriodic() {
+    }
+    
+    /**
+     * This function is called periodically during disabled mode
+     */
+    @Override
+    public void disabledPeriodic() {
 
-	}
-	
-	
-	/**
-	 * This function is called at the start of autonomous
-	 */
-	@Override
-	public void autonomousInit() {
+    }
+    
+    
+    /**
+     * This function is called at the start of autonomous
+     */
+    @Override
+    public void autonomousInit() {
 
-	}
+    }
 
-	/**
-	 * This function is called periodically during autonomous
-	 */
-	@Override
-	public void autonomousPeriodic() {
-		
-	}
-	
-	/**
-	 * This function is called at the start of teleop
-	 */
-	@Override
-	public void teleopInit() {
+    /**
+     * This function is called periodically during autonomous
+     */
+    @Override
+    public void autonomousPeriodic() {
+        
+    }
+    
+    /**
+     * This function is called at the start of teleop
+     */
+    @Override
+    public void teleopInit() {
 
-	}
-	
-	/**
-	 * This function is called periodically during operator control
-	 */
-	@Override
-	public void teleopPeriodic() {
-		System.out.println(loadMon.getCPULoadPct());
-		System.out.println(loadMon.getMemLoadPct());
-		System.out.println("----------");
-		
-	}
+    }
+    
+    /**
+     * This function is called periodically during operator control
+     */
+    @Override
+    public void teleopPeriodic() {
+        System.out.println(loadMon.getCPULoadPct());
+        System.out.println(loadMon.getMemLoadPct());
+        System.out.println("----------");
+        
+    }
 
-	/**
-	 * This function is called periodically during test mode
-	 */
-	@Override
-	public void testPeriodic() {
-	}
+    /**
+     * This function is called periodically during test mode
+     */
+    @Override
+    public void testPeriodic() {
+    }
 }
 
