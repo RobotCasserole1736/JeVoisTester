@@ -27,14 +27,15 @@
 #########################################################################################
 # Configuration - Edit these values to taste for your team.
 
-#Local file - the one you edit on your PC
-$py_source_file = ".\moduleSrc\CasseroleVision.py"
+#Module files - the ones you edit on your PC, and are specifc to the custom vision module
+$py_module_source_file = ".\moduleSrc\CasseroleVision.py"
+$py_module_cfg_file = ".\moduleSrc\script.cfg"
 
 #Module Destination folder - the place you want your module to show up on the JeVois filesystem
 # The JeVois drive letter will be automatically prepended to this path, no need to hard code it.
 $mod_dest_path = "modules\JeVois\CasseroleVision"
 
-#Configuration source files - These probably won't ever be changed
+#Global Configuration source files - These probably won't ever be changed
 $init_cfg_source_file = ".\moduleSrc\initscript.cfg"
 $params_cfg_source_file = ".\moduleSrc\params.cfg"
 $vidmap_cfg_source_file = ".\moduleSrc\videomappings.cfg"
@@ -61,7 +62,7 @@ echo "Verifying python script syntax..."
 Remove-Item "__pycache__" -Recurse -ErrorAction Ignore
 #Assemble a command to validate the script syntax via the "One True Way"
 #see https://stackoverflow.com/questions/4284313/how-can-i-check-the-syntax-of-python-script-without-executing-it
-$python_cmd = $python_exe + " -m " + $python_compile + " " + $py_source_file 
+$python_cmd = $python_exe + " -m " + $python_compile + " " + $py_module_source_file 
 #run said command
 Invoke-Expression $python_cmd
 $ret_val = $LASTEXITCODE
@@ -173,8 +174,11 @@ echo "Deploying user code files..."
 #Generate file paths and actually copy the user code files
 $py_output_location = Join-Path $drive_letter $mod_dest_path
 
-echo "Copying $py_source_file to $py_output_location "
-cp $py_source_file $py_output_location 
+echo "Copying $py_module_source_file to $py_output_location "
+cp $py_module_source_file $py_output_location 
+
+echo "Copying $py_module_cfg_file to $py_output_location "
+cp $py_module_cfg_file $py_output_location 
 
 $cfg_output_location = Join-Path $drive_letter $cfg_dest_path
 

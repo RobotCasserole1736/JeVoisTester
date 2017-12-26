@@ -83,22 +83,22 @@ if($jevois_port_name -eq ""){
 
 echo "[serial_listen] Jevois Location complete"
 
-#Configure Jevois
-
-#force all log messages to USB
-$port.WriteLine("setpar serlog USB")
 
 #Port will already be open from above code
 #adjust the read timeout to be nicer, since non-ping commands might take longer to execute.
-$port.ReadTimeout = 10
+$port.ReadTimeout = 1000
+
 
 echo "[serial_listen] Starting serial listening. Press Q to quit."
 
+
+
 while($true){
+
     try{
         echo $port.ReadLine()
     } catch {
-        Start-Sleep -m 50
+       # Start-Sleep -m 50
     }
 
     # Check if ctrl+C was pressed and quit if so.

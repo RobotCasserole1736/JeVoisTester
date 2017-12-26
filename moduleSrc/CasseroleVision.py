@@ -40,6 +40,10 @@ class CasseroleVision:
         self.fps = "0"
         self.CPULoad = "0"
         self.CPUTemp = "0"
+
+        #data structure object to hold info about the present data processed from the image fram
+        self.curTargets = []
+
         jevois.LINFO("CasseroleVision construction Finished")
         
 
@@ -47,8 +51,12 @@ class CasseroleVision:
     ## Process function with USB output
     def process(self, inframe, outframe = None):
         
-        # Start measuring image processing time (NOTE: does not account for input conversion time):
+        # Start measuring image processing time:
         self.timer.start()
+
+        #No targets found yet
+        self.tgtAvailable = False
+        self.curTargets = []
         
         #Capture image from camera
         inimg = inframe.getCvBGR()
@@ -63,20 +71,57 @@ class CasseroleVision:
         #Create a mask of only pixells which match the HSV color space thresholds we've determined
         hsv_mask = cv2.inRange(hsv,self.hsv_thres_lower, self.hsv_thres_upper)
 
+        # Erode image to remove noise if necessary.
+        hsv_mask = cv2.erode(hsv_mask, None, iterations = 3)
+        #Dilate image to fill in gaps
+        hsv_mask = cv2.dilate(hsv_mask, None, iterations = 3)
+
         #Find all countours of the outline of shapes in that mask
         _, contours, _ = cv2.findContours(hsv_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_TC89_KCOS)
 
-        #debug - report the number of available contours
-        self.tgtAvailable = str(len(contours))
+        #Extract Pertenant params from contours
+        for c in contours:
+            #Calcualte unrotated bounding rectangle (top left corner x/y, plus width and height)
+            br_x, br_y, w, h = cv2.boundingRect(c)
+            #minimal amount of qualification on targets
+            if(w > 5 and h > 5): 
+                moments = cv2.moments(c)
+                if(moments['m00'] != 0):
+                    #Calculate total filled in area
+                    area = cv2.contourArea(c)
+                    #Calculate centroid X and Y
+                    c_x = int(moments['m10']/moments['m00'])
+                    c_y = int(moments['m01']/moments['m00'])
+                    self.curTargets.append(TargetObservation(c_x, c_y, area, w, h)) 
 
-        #Generate a debug image of the input image, masking non-detected pixels
-        outimg = cv2.bitwise_and(inimg, inimg, mask = hsv_mask)
+        #If we have some contours, figure out which is the target.
+        if(len(self.curTargets) > 0):
+            self.tgtAvailable = True
+            #Find the best contour, which we will call the target
+            best_target = self.curTargets[0] #Start presuming the first is the best
+            for tgt in self.curTargets[1:]:
+                #Super-simple algorithm: biggest target wins
+                # Once the game is released, we should do more qualification than this.
+                if(tgt.boundedArea > best_target.boundedArea):
+                    best_target = tgt 
+
+
+        # Calculate target physical location and populate output
+        if(self.tgtAvailable == True):
+            #TODO: Actual math to make this right
+            self.tgtAngle = best_target.X
+            self.tgtRange = best_target.boundedArea
+        else:
+            self.tgtAngle = 0
+            self.tgtRange = 0
+
         ###############################################
         ## End Image Processing Pipeline
         ###############################################
         
         # Send processed data about target location and current status
-        jevois.sendSerial("{{{},{},{},{},{},{},{}}}\n".format(self.frame,self.tgtAvailable,self.tgtAngle, self.tgtRange,self.fps,self.CPULoad,self.CPUTemp))
+        # Note the order and number of params here must match with the roboRIO code.
+        jevois.sendSerial("{{{},{},{},{},{},{},{}}}\n".format(self.frame,("T" if self.tgtAvailable else "F"),self.tgtAngle, self.tgtRange,self.fps,self.CPULoad,self.CPUTemp))
         
 
         # Broadcast the frame if we have an output sink available
@@ -84,6 +129,17 @@ class CasseroleVision:
             #Even if we're connected, don't send every frame we process. This will
             # help keep our USB bandwidth usage down.
             if(self.frame  % self.frame_dec_factor == 0):
+                #Generate a debug image of the input image, masking non-detected pixels
+                outimg = cv2.bitwise_and(inimg, inimg, mask = hsv_mask)
+
+                #Overlay target info if found
+                if(self.tgtAvailable):
+                    top    = int(best_target.Y - best_target.height/2)
+                    bottom = int(best_target.Y + best_target.height/2)
+                    left  = int(best_target.X - best_target.width/2)
+                    right = int(best_target.X + best_target.width/2)
+                    cv2.rectangle(outimg, (right,top),(left,bottom),(255,0,0), 2,cv2.LINE_4)
+
                 # We are done with the output, ready to send it to host over USB:
                 outframe.sendCvBGR(outimg)
 
@@ -118,3 +174,16 @@ class CasseroleVision:
     def hi(self):
         return "Hi from python!"
         
+
+
+class TargetObservation(object):
+    def __init__(self, X_in, Y_in, area_in, width_in, height_in):
+        self.X = (X_in)
+        self.Y = (Y_in)
+        self.boundedArea = (area_in)
+        self.width = (width_in)
+        self.height = (height_in)
+        
+
+
+
