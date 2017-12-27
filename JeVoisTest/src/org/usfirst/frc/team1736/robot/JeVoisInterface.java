@@ -68,15 +68,15 @@ public class JeVoisInterface {
     //=======================================================
 
     /**
-     * Constructor. Opens a USB serial port to the JeVois camera, sends a few test commands checking for error,
+     * Constructor (simple). Opens a USB serial port to the JeVois camera, sends a few test commands checking for error,
      * then fires up the user's program and begins listening for target info packets in the background
      */
     public JeVoisInterface() {
-        JeVoisInterface(false); //Default - stream disabled, just run serial.
+        this(false); //Default - stream disabled, just run serial.
     }
 
     /**
-     * Constructor. Opens a USB serial port to the JeVois camera, sends a few test commands checking for error,
+     * Constructor (more complex). Opens a USB serial port to the JeVois camera, sends a few test commands checking for error,
      * then fires up the user's program and begins listening for target info packets in the background.
      * Pass TRUE to additionaly enable a USB camera stream of what the vision camera is seeing.
      */
@@ -98,6 +98,7 @@ public class JeVoisInterface {
                 System.out.println("Retry " + Integer.toString(retry_counter));
             }
         }
+
         
         //Report an error if we didn't get to open the serial port
         if(visionPort == null){
@@ -110,6 +111,9 @@ public class JeVoisInterface {
             DriverStation.reportError("JeVois ping test failed. Not starting vision system.", false);
             return;
         }
+        
+        //Ensure the JeVois is starting with the stream off.
+        stopDataOnlyStream();
 
         setCameraStreamActive(useUSBStream);
         start();
@@ -213,6 +217,13 @@ public class JeVoisInterface {
     }
     
     /**
+     * Returns true when the JeVois sees a target and is tracking it, false otherwise.
+     */
+    public boolean isTgtVisible() {
+        return tgtVisible;
+    }
+    
+    /**
      * Returns the JeVois's most recently reported CPU Temperature in deg C
      */
     public double getJeVoisCPUTemp_C(){
@@ -236,8 +247,12 @@ public class JeVoisInterface {
     /**
      * Returns the roboRIO measured serial packet recieve rate in packets per second
      */
-    public double getPacketRxRate_PPS(){
-        return packetRxRatePPS;
+    public int getPacketRxRate_PPS(){
+    	if(visionOnline){
+    		return (int)Math.round(packetRxRatePPS);
+    	} else {
+    		return 0;
+    	}
     }
 
     //=======================================================
@@ -255,7 +270,7 @@ public class JeVoisInterface {
         String packet;
         
         prevPacketRxTime = packetRxTime;
-        packet = blockAndGetPacket(10);
+        packet = blockAndGetPacket(2.0);
         
         
         if(packet != null){
@@ -409,6 +424,7 @@ public class JeVoisInterface {
                         retval = 0;
                         break;
                     }else if(testStr.contains("ERR")){
+                    	DriverStation.reportError("JeVois reported error:\n" + testStr, false);
                         retval = -1;
                         break;
                     }
@@ -423,7 +439,7 @@ public class JeVoisInterface {
     
     
     // buffer to contain data from the port while we gather full packets 
-    private String packetBuffer = "";
+    private StringBuffer packetBuffer = new StringBuffer(100);
     /** 
      * Blocks thread execution till we get a valid packet from the serial line
      * or timeout. 
@@ -434,28 +450,33 @@ public class JeVoisInterface {
     private String blockAndGetPacket(double timeout_s){
         String retval = null;
         double startTime = Timer.getFPGATimestamp();
+        int endIdx = -1;
+        int startIdx = -1;
+        
         if (visionPort != null){
             while(Timer.getFPGATimestamp() - startTime < timeout_s){
                 // Keep trying to get bytes from the serial port until the timeout expires.
+            	
                 
                 if (visionPort.getBytesReceived() > 0) {
                     // If there are any bytes available, read them in and 
                     //  append them to the buffer.
-                    packetBuffer += visionPort.readString();
-                    
+                	packetBuffer = packetBuffer.append(visionPort.readString());
+
                     // Attempt to detect if the buffer currently contains a complete packet
-                    if(packetBuffer.contains(PACKET_START_CHAR)){
-                        if(packetBuffer.contains(PACKET_END_CHAR)){
+                    if(packetBuffer.indexOf(PACKET_START_CHAR) != -1){
+                    	endIdx = packetBuffer.lastIndexOf(PACKET_END_CHAR);
+                        if(endIdx != -1){
                             // Buffer also contains at least one start & end character.
                             // But we don't know if they're in the right order yet.
                             // Start by getting the most-recent packet end character's index
-                            int endIdx = packetBuffer.lastIndexOf(PACKET_END_CHAR);
+                             
                             
                             // Look for the index of the start character for the packet
                             //  described by endIdx. Note this line of code assumes the 
                             //  start character for the packet must come _before_ the
                             //  end character.
-                            int startIdx = packetBuffer.lastIndexOf(PACKET_START_CHAR, endIdx);
+                            startIdx = packetBuffer.lastIndexOf(PACKET_START_CHAR, endIdx);
                             
                             if(startIdx == -1){
                                 // If there was no start character before the end character,
@@ -464,24 +485,26 @@ public class JeVoisInterface {
                                 // Since we've started to receive a good packet, discard 
                                 //  everything prior to the start character.
                                 startIdx = packetBuffer.lastIndexOf(PACKET_START_CHAR);
-                                packetBuffer = packetBuffer.substring(startIdx);
+                                packetBuffer.delete(0, startIdx);
                             } else {
                                 // Buffer contains a full packet. Extract it and clean up buffer
                                 retval = packetBuffer.substring(startIdx+1, endIdx-1);
-                                packetBuffer = packetBuffer.substring(endIdx+1);
+                                packetBuffer.delete(0, endIdx+1);
                                 break;
                             } 
                         } else {
                           // In this case, we have a start character, but no end to the buffer yet. 
                           //  Do nothing, just wait for more characters to come in.
+                          sleep(5);
                         }
                     } else {
                         // Buffer contains no start characters. None of the current buffer contents can 
                         //  be meaningful. Discard the whole thing.
-                        packetBuffer = "";
+                        packetBuffer.delete(0, packetBuffer.length());
+                        sleep(5);
                     }
                 } else {
-                    sleep(10);
+                    sleep(5);
                 }
             }
         }
@@ -525,7 +548,7 @@ public class JeVoisInterface {
      * @param pkt
      */
     public int parsePacket(String pkt, double rx_Time){
-        //Parsing constants
+        //Parsing constants. These must be aligned with JeVois code.
 		final int NUM_EXPECTED_TOKENS = 8;
 		final int FRAME_CTR_TOKEN_IDX = 0; //currently unused
         final int TGT_VISIBLE_TOKEN_IDX = 1;
@@ -536,26 +559,29 @@ public class JeVoisInterface {
         final int JV_CPUTEMP_TOKEN_IDX = 6;
         final int JV_PIPLINE_DELAY_TOKEN_IDX = 7;
 
-        //TODO - populate the following based on packet contents & rxTime:
-        // AngleDeg, tgtRange, tgtTime, jeVoisCpuTempC, jeVoisCpuLoadPct, jeVoisFramerateFPS
+        //Split string into many substrings, presuming those strings are separated by commas
         String[] tokens = pkt.split(",");
 
+        //Check there were enough substrings found
         if(tokens.length < NUM_EXPECTED_TOKENS){
-            DriverStation.reportError("Got malformed vision packet. Expected 8 tokens, but only found " + Integer.toString(tokens.length) + ". Packet Contents: " + pkt);
+            DriverStation.reportError("Got malformed vision packet. Expected 8 tokens, but only found " + Integer.toString(tokens.length) + ". Packet Contents: " + pkt, false);
             return -1;
         }
 
+        //Convert each string into the proper internal value
         try {
             
+        	//Boolean values should only have T or F characters
             if(tokens[TGT_VISIBLE_TOKEN_IDX].equals("F")){
                 tgtVisible = false;
             } else if (tokens[TGT_VISIBLE_TOKEN_IDX].equals("T")) {
                 tgtVisible = true;
             } else {
-                DriverStation.reportError("Got malformed vision packet. Expected only T or F in " + Integer.toString(TGT_VISIBLE_TOKEN_IDX) + ", but got " + tokens[TGT_VISIBLE_TOKEN_IDX]);
+                DriverStation.reportError("Got malformed vision packet. Expected only T or F in " + Integer.toString(TGT_VISIBLE_TOKEN_IDX) + ", but got " + tokens[TGT_VISIBLE_TOKEN_IDX], false);
                 return -1;
             }
 
+            //Use Java built-in double to string conversion on most of the rest
             tgtAngleDeg = Double.parseDouble(tokens[TGT_ANGLE_TOKEN_IDX]);
             tgtRange    = Double.parseDouble(tokens[TGT_RANGE_TOKEN_IDX]);
             tgtTime  = rx_Time - Double.parseDouble(tokens[JV_PIPLINE_DELAY_TOKEN_IDX])/1000000.0;
@@ -563,7 +589,7 @@ public class JeVoisInterface {
             jeVoisCpuLoadPct = Double.parseDouble(tokens[JV_CPULOAD_TOKEN_IDX]);
 
         } catch (Exception e) {
-            DriverStation.reportError("Unhandled exception while parsing Vision packet: " + e.getMessage() + "\n" + e.getStackTrace());
+            DriverStation.reportError("Unhandled exception while parsing Vision packet: " + e.getMessage() + "\n" + e.getStackTrace(), false);
             return -1;
         }
 
@@ -578,7 +604,9 @@ public class JeVoisInterface {
      */
     Thread packetListenerThread = new Thread(new Runnable(){
         public void run(){
-            backgroundUpdate();        
+        	while(!Thread.interrupted()){
+        		backgroundUpdate();   
+        	}
         }
     });
     

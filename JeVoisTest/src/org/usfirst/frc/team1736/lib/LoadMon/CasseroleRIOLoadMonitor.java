@@ -56,7 +56,7 @@ import java.io.IOException;
 public class CasseroleRIOLoadMonitor {
 	
 	/** Rate of update of the load variables in milliseconds. 1s should be enough? */
-	public static final int UPDATE_RATE_MS = 1000;
+	public static final int UPDATE_RATE_MS = 250;
 	
 	/** Overall (all-cpu) load percentage (non-idle time) */
 	public double totalCPULoadPct = 0;
