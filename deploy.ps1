@@ -20,7 +20,7 @@
 # 1) Search all COM ports for JeVois (unopened and responds correctly to ping)
 # 2) Send commands to put the JeVois in USB file transfer mode
 # 3) Copy the local development file over to the JeVois
-# 4) Eject the USB drive and close the 
+# 4) Eject the USB drive and close the serial port
 #########################################################################################
 
 
