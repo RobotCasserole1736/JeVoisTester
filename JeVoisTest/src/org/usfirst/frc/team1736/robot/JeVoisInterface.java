@@ -526,7 +526,8 @@ public class JeVoisInterface {
      */
     public int parsePacket(String pkt, double rx_Time){
         //Parsing constants
-        final int NUM_EXPECTED_TOKENS = 8;
+		final int NUM_EXPECTED_TOKENS = 8;
+		final int FRAME_CTR_TOKEN_IDX = 0; //currently unused
         final int TGT_VISIBLE_TOKEN_IDX = 1;
         final int TGT_ANGLE_TOKEN_IDX = 2;
         final int TGT_RANGE_TOKEN_IDX = 3;
