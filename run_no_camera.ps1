@@ -13,11 +13,13 @@
 #   if you would consider donating to our club to help further STEM education.
 #########################################################################################
 #
-# serial_listen.ps1 - Opens the JeVois serial port and dumps to console
+# run_no_camera.ps1 - Opens the JeVois serial port, starts the vision algorithm, 
+#                      and dumps any results to console
 #
 # Algorithm:
 # 1) Search all COM ports for JeVois (unopened and responds correctly to ping)
-# 2) Dump all output to the console
+# 2) Run commands to start vision processing (setmaping, streamon)
+# 3) Dump all output to the console
 #########################################################################################
 
 
