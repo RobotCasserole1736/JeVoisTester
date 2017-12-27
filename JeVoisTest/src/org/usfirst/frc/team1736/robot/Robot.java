@@ -24,7 +24,7 @@ public class Robot extends IterativeRobot {
      */
     @Override
     public void robotInit() {
-        testCam = new JeVoisInterface(false);
+        testCam = new JeVoisInterface(true);
         loadMon = new CasseroleRIOLoadMonitor();
     }
     
@@ -41,6 +41,10 @@ public class Robot extends IterativeRobot {
      */
     @Override
     public void disabledPeriodic() {
+        System.out.print("s");
+        System.out.println(testCam.getPacketRxRate_PPS());
+        System.out.print("r");
+        System.out.println(loadMon.getCPULoadPct());
 
     }
     
@@ -75,6 +79,10 @@ public class Robot extends IterativeRobot {
     @Override
     public void teleopPeriodic() {
         System.out.println("==============+++==============");
+        System.out.print("Vision Online: ");
+        System.out.println(testCam.isVisionOnline());
+        System.out.print("Target Visible: ");
+        System.out.println(testCam.isTgtVisible());
         System.out.print("Target Angle: ");
         System.out.println(testCam.getTgtAngle_Deg());
         System.out.print("Target Range:");

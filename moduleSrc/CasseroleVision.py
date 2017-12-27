@@ -20,7 +20,7 @@ class CasseroleVision:
 
         #USB send frame decimation
         #Reduces send rate by this factor to limit USB bandwidth at high process rates
-        self.frame_dec_factor = 4
+        self.frame_dec_factor = 6 #At 60FPS, this still delivers 10FPS to the driver
 
         #Processing tune constants
         #TODO - Pick better constants
@@ -141,7 +141,7 @@ class CasseroleVision:
             # help keep our USB bandwidth usage down.
             if(self.frame  % self.frame_dec_factor == 0):
                 #Generate a debug image of the input image, masking non-detected pixels
-                outimg = cv2.bitwise_and(inimg, inimg, mask = hsv_mask)
+                outimg = inimg
 
                 #Overlay target info if found
                 if(self.tgtAvailable):
@@ -164,13 +164,19 @@ class CasseroleVision:
     # ###################################################################################################
     ## Parse a serial command forwarded to us by the JeVois Engine, return a string
     def parseSerial(self, str):
+
+        if(str.strip() == ""):
+            #For some reason, the jevois engine sometimes sends empty strings.
+            # Just do nothing in this case.
+            return ""
+
         jevois.LINFO("parseserial received command [{}]".format(str))
         if str == "hello":
             return self.hello()
         elif str == "Geevoooice":
             return self.hi()
-        return "ERR: Unsupported command"
-    
+        return "ERR: Unsupported command. "
+
     # ###################################################################################################
     ## Return a string that describes the custom commands we support, for the JeVois help message
     def supportedCommands(self):
