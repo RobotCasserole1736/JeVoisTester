@@ -22,3 +22,7 @@ Super-de-duper simple webpage to display a streamed image from the roboRIO
 ## deploy.ps1
 
 Powershell script to take the python files from moduleSource, do some basic verification, and deploy them to a connected JeVois camera.
+
+## serial_listen.ps1
+
+Powershell script to find & open the JeVois serial port, and then just listen for whatever packets are received. These are printed to console. Press 'q' to quit. 

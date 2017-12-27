@@ -51,9 +51,10 @@ public class JeVoisInterface {
     private double packetRate_PPS = 0;
 
     // Most recently seen target information
-    private double tgtAngleDeg = 0;
-    private double tgtRange = 0;
-    private double tgtTime = 0;
+    private boolean tgtVisible = false;
+    private double  tgtAngleDeg = 0;
+    private double  tgtRange = 0;
+    private double  tgtTime = 0;
     
     // Info about the JeVois performace & status
     private double jeVoisCpuTempC = 0;
@@ -100,7 +101,7 @@ public class JeVoisInterface {
         
         //Report an error if we didn't get to open the serial port
         if(visionPort == null){
-            DriverStation.reportError("Error, Cannot open serial port to JeVois. Not starting vision system.", false);
+            DriverStation.reportError("Cannot open serial port to JeVois. Not starting vision system.", false);
             return;
         }
         
@@ -221,21 +222,21 @@ public class JeVoisInterface {
     /**
      * Returns the JeVois's most recently reported CPU Load in percent of max
      */
-    public double jeVoisCpuLoad_pct(){
+    public double getJeVoisCpuLoad_pct(){
         return jeVoisCpuLoadPct;
     }
 
     /**
      * Returns the JeVois's most recently reported pipline framerate in Frames per second
      */
-    public double jeVoisFramerate_FPS(){
+    public double getJeVoisFramerate_FPS(){
         return jeVoisFramerateFPS;
     }
 
     /**
      * Returns the roboRIO measured serial packet recieve rate in packets per second
      */
-    public double packetRxRate_PPS(){
+    public double getPacketRxRate_PPS(){
         return packetRxRatePPS;
     }
 
@@ -259,9 +260,12 @@ public class JeVoisInterface {
         
         if(packet != null){
             packetRxTime = Timer.getFPGATimestamp();
-            visionOnline = true;
-            parsePacket(packet, packetRxTime);
-            packetRxRatePPS = 1.0/(packetRxTime - prevPacketRxTime);
+            if( parsePacket(packet, packetRxTime) == 0){
+                visionOnline = true;
+                packetRxRatePPS = 1.0/(packetRxTime - prevPacketRxTime);
+            } else {
+                visionOnline = false;
+            }
             
         } else {
             visionOnline = false;
@@ -520,9 +524,50 @@ public class JeVoisInterface {
      * Parse individual numbers from a packet
      * @param pkt
      */
-    public void parsePacket(String pkt, double rx_Time){
+    public int parsePacket(String pkt, double rx_Time){
+        //Parsing constants
+        final int NUM_EXPECTED_TOKENS = 8;
+        final int TGT_VISIBLE_TOKEN_IDX = 1;
+        final int TGT_ANGLE_TOKEN_IDX = 2;
+        final int TGT_RANGE_TOKEN_IDX = 3;
+        final int JV_FRMRT_TOKEN_IDX = 4;
+        final int JV_CPULOAD_TOKEN_IDX = 5;
+        final int JV_CPUTEMP_TOKEN_IDX = 6;
+        final int JV_PIPLINE_DELAY_TOKEN_IDX = 7;
+
         //TODO - populate the following based on packet contents & rxTime:
         // AngleDeg, tgtRange, tgtTime, jeVoisCpuTempC, jeVoisCpuLoadPct, jeVoisFramerateFPS
+        String[] tokens = pkt.split(",");
+
+        if(tokens.length < NUM_EXPECTED_TOKENS){
+            DriverStation.reportError("Got malformed vision packet. Expected 8 tokens, but only found " + Integer.toString(tokens.length) + ". Packet Contents: " + pkt);
+            return -1;
+        }
+
+        try {
+            
+            if(tokens[TGT_VISIBLE_TOKEN_IDX].equals("F")){
+                tgtVisible = false;
+            } else if (tokens[TGT_VISIBLE_TOKEN_IDX].equals("T")) {
+                tgtVisible = true;
+            } else {
+                DriverStation.reportError("Got malformed vision packet. Expected only T or F in " + Integer.toString(TGT_VISIBLE_TOKEN_IDX) + ", but got " + tokens[TGT_VISIBLE_TOKEN_IDX]);
+                return -1;
+            }
+
+            tgtAngleDeg = Double.parseDouble(tokens[TGT_ANGLE_TOKEN_IDX]);
+            tgtRange    = Double.parseDouble(tokens[TGT_RANGE_TOKEN_IDX]);
+            tgtTime  = rx_Time - Double.parseDouble(tokens[JV_PIPLINE_DELAY_TOKEN_IDX])/1000000.0;
+            jeVoisCpuTempC   = Double.parseDouble(tokens[JV_CPUTEMP_TOKEN_IDX]);
+            jeVoisCpuLoadPct = Double.parseDouble(tokens[JV_CPULOAD_TOKEN_IDX]);
+
+        } catch (Exception e) {
+            DriverStation.reportError("Unhandled exception while parsing Vision packet: " + e.getMessage() + "\n" + e.getStackTrace());
+            return -1;
+        }
+
+        return 0;
+
         
     }
     

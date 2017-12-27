@@ -74,9 +74,22 @@ public class Robot extends IterativeRobot {
      */
     @Override
     public void teleopPeriodic() {
+        System.out.println("==============+++==============");
+        System.out.print("Target Angle: ");
+        System.out.println(testCam.getTgtAngle_Deg());
+        System.out.print("Target Range:");
+        System.out.println(testCam.getTgtRange_in());
+        System.out.print("Serial Packet RX Rate: ");
+        System.out.println(testCam.getPacketRxRate_PPS());
+        System.out.print("JeVois Framerate: ");
+        System.out.println(testCam.getJeVoisFramerate_FPS());
+        System.out.print("JeVois CPU Load: ");
+        System.out.println(testCam.getJeVoisCpuLoad_pct());
+        System.out.print("RIO CPU Load: ");
         System.out.println(loadMon.getCPULoadPct());
+        System.out.print("RIO MEM Load: ");
         System.out.println(loadMon.getMemLoadPct());
-        System.out.println("----------");
+        System.out.println("===============================\n\n\n");
         
     }
 
