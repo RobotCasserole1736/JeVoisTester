@@ -77,66 +77,54 @@ if($ret_val)
 echo "Verification stage complete"
 
 echo "========================================================================"
-echo "Attempting to find attached JeVois..."
-
-
-# Get all port names present on the PC
-$port_name_list = [System.IO.Ports.SerialPort]::getportnames()
-
-
-#Strategy: for each port on the system, attempt to open it and send "ping".
-# if it responds with ALIVE, we assume we have found the JeVois.
-foreach($port_name in $port_name_list)
-{
-    echo "Checking $port_name"
-    try {
-        #Try to open & configure the port
-        $port= new-Object System.IO.Ports.SerialPort $port_name,115200,None,8,one
-        $port.Open()
-        $port.ReadTimeout = 500
-    }
-    catch {
-        echo "Failed to open and configure $port_name"
-        if($port.IsOpen){
-            $port.Close()
-        }
-        continue
-    }
-
-    try {
-        #Assuming the port open works, send ping.
-        # Note if we send this to a poorly-implemented device that is not a JeVois, 
-        # we may cause it to have bad behavior. Hopefully that will not be the case. 
-        # If it is for you, just kill off part 1 of this code and hardcode the
-        # JeVois COM port.
-        $port.WriteLine("ping")
-        $response = $port.ReadLine()
-        if($response -like "*ALIVE*")
-        {
-            #Expect that a real jevois will respond with al ive
-            $jevois_port_name = $port_name
-            echo "Found JeVois on $jevois_port_name"
-            break
-        }
-        else {
-            echo "Incorrect Response from $port_name"
-        }
-        $port.Close();
-    } catch {
-        echo "Failed to get proper response on $port_name"
-        if($port.IsOpen){
-            $port.Close()
-        }
-        continue
-    }
+echo "Available Serial Ports: "
+Get-WMIObject Win32_PnPEntity | where {$_.Name -like "USB Serial Port*"} |
+    Format-Table Name, Description, Manufacturer
+echo ""
+$port_num = Read-Host -Prompt 'Select the port number to use (ex: 4): '
+$port_name = Write-host "COM" $port_num
+try {
+    #Try to open & configure the port
+    $port= new-Object System.IO.Ports.SerialPort $port_name,115200,None,8,one
+    $port.Open()
+    $port.ReadTimeout = 500
 }
-
-if($jevois_port_name -eq ""){
-    Write-Error "Failed to open JeVois serial port - is it plugged in and not already open?"
+catch {
+    echo "Failed to open and configure $port_name"
+    if($port.IsOpen){
+        $port.Close()
+    }
     exit -1
 }
 
-echo "Jevois Location complete"
+
+try {
+    #Assuming the port-open works, send ping.
+    # Note if we send this to a poorly-implemented device that is not a JeVois, 
+    # we may cause it to have bad behavior. Hopefully that will not be the case. 
+    $port.WriteLine("ping")
+    $response = $port.ReadLine()
+    if($response -like "*ALIVE*")
+    {
+        #Expect that a real jevois will respond with al ive
+        $jevois_port_name = $port_name
+        echo "Found JeVois on $jevois_port_name"
+        break
+    }
+    else {
+        echo "Incorrect Response from $port_name"
+    }
+    $port.Close();
+} catch {
+    echo "Failed to get proper response on $port_name"
+    if($port.IsOpen){
+        $port.Close()
+    }
+    exit -1
+}
+
+echo "Jevois Serial Connection complete"
+
 
 
 echo "========================================================================"
