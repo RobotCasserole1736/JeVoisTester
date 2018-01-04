@@ -79,10 +79,10 @@ echo "Verification stage complete"
 echo "========================================================================"
 echo "Available Serial Ports: "
 Get-WMIObject Win32_PnPEntity | where {$_.Name -like "USB Serial Port*"} |
-    Format-Table Name, Description, Manufacturer
+    Format-Table Name, Description, Manufacturer, Caption
 echo ""
 $port_num = Read-Host -Prompt 'Select the port number to use (ex: 4): '
-$port_name = Write-host "COM" $port_num
+$port_name = Write-Output "COM${port_num}"
 try {
     #Try to open & configure the port
     $port= new-Object System.IO.Ports.SerialPort $port_name,115200,None,8,one
