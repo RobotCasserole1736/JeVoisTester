@@ -1,16 +1,29 @@
 import libjevois as jevois
+import cv2
+import numpy as np
 import time
 import re
-import numpy as np
-import cv2
 from datetime import datetime
-####################################################################################################
-## Copyright 2017 FRC Team 1736 Robot Casserole
-####################################################################################################
-## Casserole Vision - Vision Processing test for the 2018 Game 
-####################################################################################################
+
+## Detects stuff for FRC
+#
+# Add some description of your module here.
+#
+# @author Robot Casserole
+# 
+# @videomapping YUYV 352 288 15 YUYV 352 288 60 RobotCasserole CasseroleVision
+# @email 
+# @address 123 first street, Los Angeles CA 90012, USA
+# @copyright Copyright (C) 2018 by Robot Casserole
+# @mainurl 
+# @supporturl 
+# @otherurl 
+# @license 
+# @distribution Unrestricted
+# @restrictions None
+# @ingroup modules
 class CasseroleVision:
-    ####################################################################################################
+    # ###################################################################################################
     ## Constructor
     def __init__(self):
         jevois.LINFO("CasseroleVision Constructor...")
@@ -49,10 +62,9 @@ class CasseroleVision:
 
         jevois.LINFO("CasseroleVision construction Finished")
         
-
     # ###################################################################################################
     ## Process function with USB output
-    def process(self, inframe, outframe = None):
+    def process(self, inframe, outframe):
         
         # Start measuring image processing time:
         self.timer.start()
@@ -83,7 +95,7 @@ class CasseroleVision:
         hsv_mask = cv2.dilate(hsv_mask, None, iterations = 3)
 
         #Find all countours of the outline of shapes in that mask
-        _, contours, _ = cv2.findContours(hsv_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_TC89_KCOS)
+        contours,hierarchy  = cv2.findContours(hsv_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_TC89_KCOS)
 
         #Extract Pertenant params from contours
         for c in contours:
@@ -160,6 +172,7 @@ class CasseroleVision:
             self.framerate_fps = results.group(1)
             self.CPULoad_pct = results.group(2)
             self.CPUTemp_C = results.group(3)
+            
 
     # ###################################################################################################
     ## Parse a serial command forwarded to us by the JeVois Engine, return a string
@@ -201,6 +214,3 @@ class TargetObservation(object):
         self.width = (width_in)
         self.height = (height_in)
         
-
-
-
