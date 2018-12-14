@@ -61,11 +61,21 @@ class CasseroleVision:
         self.curTargets = []
 
         jevois.LINFO("CasseroleVision construction Finished")
+
+    # ###################################################################################################
+    ## Process function with only Serial output
+    def processNoUSB(self, inframe):
+        self.processCommon( inframe, None)
         
     # ###################################################################################################
-    ## Process function with USB output
+    ## Process function with USB Video output
     def process(self, inframe, outframe):
-        
+        self.processCommon( inframe, outframe)
+
+
+    # ###################################################################################################
+    ## Process Common
+    def processCommon(self, inframe, outframe):
         # Start measuring image processing time:
         self.timer.start()
 
